@@ -19,7 +19,7 @@ jobs:
 
       - name: Take the preview down after the expiry time
         env:
-          EXPIRES_AT: '2026-11-12T10:00:00Z'
+          EXPIRES_AT: '2026-11-13T10:00:00Z'
           GH_TOKEN: ${{ github.token }}
         run: |
           now=$(date -u +%s)
