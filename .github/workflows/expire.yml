@@ -1,0 +1,57 @@
+name: expire-preview
+
+# Temporary preview. After EXPIRES_AT this replaces the published site with a short
+# "expired" page, so the preview ends on its own without anyone's computer being on.
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  expire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Take the preview down after the expiry time
+        env:
+          EXPIRES_AT: '2026-11-12T10:00:00Z'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          now=$(date -u +%s)
+          end=$(date -u -d "$EXPIRES_AT" +%s)
+          if [ "$now" -lt "$end" ]; then
+            echo "Still live until $EXPIRES_AT."
+            exit 0
+          fi
+          if [ -f EXPIRED ]; then
+            echo "Already expired."
+            gh workflow disable expire-preview || true
+            exit 0
+          fi
+          git rm -r -q --ignore-unmatch assets fonts images favicon.svg
+          cat > index.html <<'HTML'
+          <!doctype html>
+          <html lang="ko">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <meta name="robots" content="noindex, nofollow" />
+              <title>미리보기가 종료되었습니다</title>
+            </head>
+            <body style="margin:0;display:grid;min-height:100vh;place-items:center;background:#ffcad4;color:#3b5c45;font-family:system-ui,sans-serif;text-align:center">
+              <p>임시 미리보기 기간이 끝났습니다.</p>
+            </body>
+          </html>
+          HTML
+          date -u +%Y-%m-%dT%H:%M:%SZ > EXPIRED
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Expire temporary preview"
+          git push -q
+          gh workflow disable expire-preview || true
